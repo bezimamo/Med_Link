@@ -37,6 +37,7 @@ export function UsersList() {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [formData, setFormData] = useState({
     fullName: "",
@@ -46,72 +47,59 @@ export function UsersList() {
     department: "General",
   })
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      if (!user?.token) {
-        console.log("[UsersList] Missing token")
-        setIsLoading(false)
-        return
-      }
-
-      try {
-        setIsLoading(true)
-        // ✅ FIXED: Only pass token, not hospitalId
-        const response = await userApi.getUsers(user.token)
-        console.log("[UsersList] API response:", response)
-
-        if (response.success && response.data) {
-          // Filter to show only DOCTOR and LIAISON_OFFICER users
-          const filteredUsers = Array.isArray(response.data)
-             ? response.data
-            : []
-            console.log("[DEBUG] Raw response data:", response.data)
-console.log("[DEBUG] Number of users:", response.data?.length || 0)
-
-if (Array.isArray(response.data)) {
-  response.data.forEach((u, i) => {
-    console.log(`User ${i}:`, {
-      id: u._id,
-      name: u.fullName,
-      email: u.email,
-      role: u.role,
-      hospitalId: u.hospitalId,
-      isActive: u.isActive
-    })
-  })
-}
-          
-          const formattedUsers = filteredUsers.map((u: any) => ({
-            _id: u._id,
-            id: u._id,
-            fullName: u.fullName,
-            email: u.email,
-            role: u.role === "DOCTOR" ? "Doctor" : 
-                  u.role === "LIAISON_OFFICER" ? "Liaison Officer" : u.role,
-            department: u.department || "General",
-            status: u.isActive ? "Active" : "Inactive",
-            isActive: u.isActive
-          }))
-          
-          setUsers(formattedUsers)
-          setError("")
-        } else {
-          setError(response.error || "Failed to fetch users")
-          setUsers([])
-        }
-      } catch (err) {
-        console.error("[UsersList] Error fetching users:", err)
-        setError("Failed to fetch users")
-      } finally {
-        setIsLoading(false)
-      }
+  // Fetch users function
+  const fetchUsers = async () => {
+    if (!user?.token) {
+      console.log("[UsersList] Missing token")
+      setIsLoading(false)
+      return
     }
 
+    try {
+      setIsLoading(true)
+      const response = await userApi.getUsers(user.token)
+      console.log("[UsersList] Fetch response:", response)
+
+      if (response.success && response.data) {
+        const filteredUsers = Array.isArray(response.data)
+          ? response.data.filter((u: any) => 
+              u.role === "DOCTOR" || u.role === "LIAISON_OFFICER"
+            )
+          : []
+        
+        const formattedUsers = filteredUsers.map((u: any) => ({
+          _id: u._id,
+          id: u._id,
+          fullName: u.fullName,
+          email: u.email,
+          role: u.role === "DOCTOR" ? "Doctor" : 
+                u.role === "LIAISON_OFFICER" ? "Liaison Officer" : u.role,
+          department: u.department || "General",
+          status: u.isActive ? "Active" : "Inactive",
+          isActive: u.isActive
+        }))
+        
+        setUsers(formattedUsers)
+        setError("")
+      } else {
+        setError(response.error || "Failed to fetch users")
+        setUsers([])
+      }
+    } catch (err) {
+      console.error("[UsersList] Error fetching users:", err)
+      setError("Failed to fetch users")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    console.log("[DEBUG] Current user:", user)
     fetchUsers()
-  }, [user?.token]) // Only depend on token
+  }, [user?.token])
 
   const handleAddUser = async () => {
-    if (!formData.fullName || !formData.email || !formData.password || !user?.token) {
+    if (!formData.fullName || !formData.email || !formData.password || !user?.token || !user?.hospitalId) {
       setError("Please fill in all fields")
       return
     }
@@ -124,8 +112,8 @@ if (Array.isArray(response.data)) {
         fullName: formData.fullName,
         email: formData.email,
         password: formData.password,
-        role: formData.role, // "DOCTOR" or "LIAISON_OFFICER"
-        
+        role: formData.role,
+        hospitalId: user.hospitalId,
       }
 
       console.log("[UsersList] Creating user:", createData)
@@ -138,12 +126,13 @@ if (Array.isArray(response.data)) {
           fullName: response.data.fullName,
           email: response.data.email,
           role: response.data.role === "DOCTOR" ? "Doctor" : "Liaison Officer",
-          department: response.data.department || "General",
           status: response.data.isActive ? "Active" : "Inactive",
+          isActive: response.data.isActive
         }
         setUsers([...users, newUser])
         setFormData({ fullName: "", email: "", password: "", role: "DOCTOR", department: "General" })
         setIsOpen(false)
+        setError("")
       } else {
         setError(response.error || "Failed to create user")
       }
@@ -156,47 +145,77 @@ if (Array.isArray(response.data)) {
   }
 
   const handleDeleteUser = async (userId: string) => {
-    if (!user?.token) return
+    console.log("🗑️ Deleting user:", userId)
+    
+    if (!user?.token) {
+      setError("No authentication token")
+      return
+    }
 
     try {
+      setDeletingUserId(userId)
       setError("")
+      
+      // Optimistic update - remove immediately from UI
+      setUsers(prevUsers => prevUsers.filter(u => u._id !== userId))
+      
       const response = await userApi.deleteUser(userId, user.token)
+      console.log("Delete response:", response)
 
-      if (response.success) {
-        setUsers(users.filter((u) => u._id !== userId))
-      } else {
+      if (!response.success) {
+        // If delete failed, refetch users to restore state
+        await fetchUsers()
         setError(response.error || "Failed to delete user")
       }
     } catch (err) {
-      console.error("[UsersList] Error deleting user:", err)
+      console.error("Delete error:", err)
+      // If error, refetch users to restore state
+      await fetchUsers()
       setError("Failed to delete user")
+    } finally {
+      setDeletingUserId(null)
     }
   }
 
   const handleUpdateUser = async (userId: string, updates: Partial<User>) => {
-    if (!user?.token) return
+    console.log("✏️ Updating user:", userId, updates)
+    
+    if (!user?.token) {
+      setError("No authentication token")
+      return
+    }
 
     try {
       setError("")
-      const response = await userApi.updateUser(userId, updates, user.token)
+      
+      // Prepare update data - only send what backend expects
+      const updateData: any = {}
+      if (updates.isActive !== undefined) {
+        updateData.isActive = updates.isActive
+      }
+      
+      console.log("Sending update:", updateData)
+      const response = await userApi.updateUser(userId, updateData, user.token)
+      console.log("Update response:", response)
 
       if (response.success && response.data) {
-        setUsers(users.map(u => 
-          u._id === userId 
-            ? { 
-                ...u, 
-                ...updates,
-                status: updates.isActive !== undefined 
-                  ? updates.isActive ? "Active" : "Inactive" 
-                  : u.status 
-              }
-            : u
-        ))
+        // Update UI state
+        setUsers(prevUsers => 
+          prevUsers.map(u => 
+            u._id === userId 
+              ? { 
+                  ...u, 
+                  isActive: updates.isActive,
+                  status: updates.isActive ? "Active" : "Inactive"
+                }
+              : u
+          )
+        )
       } else {
         setError(response.error || "Failed to update user")
       }
     } catch (err) {
-      console.error("[UsersList] Error updating user:", err)
+      console.error("Update error:", err)
       setError("Failed to update user")
     }
   }
@@ -335,7 +354,6 @@ if (Array.isArray(response.data)) {
                             size="sm" 
                             className="h-8 w-8 p-0"
                             onClick={() => {
-                              // Toggle active status
                               const newStatus = !userItem.isActive
                               handleUpdateUser(userItem._id!, { isActive: newStatus })
                             }}
@@ -347,12 +365,17 @@ if (Array.isArray(response.data)) {
                             size="sm"
                             className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
                             onClick={() => {
-                              if (userItem._id) {
+                              if (userItem._id && confirm(`Delete ${userItem.fullName}?`)) {
                                 handleDeleteUser(userItem._id)
                               }
                             }}
+                            disabled={deletingUserId === userItem._id}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            {deletingUserId === userItem._id ? (
+                              <span className="animate-spin">↻</span>
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
                           </Button>
                         </div>
                       </td>
