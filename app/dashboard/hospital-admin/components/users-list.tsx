@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/lib/auth-context"
-import { userApi } from "@/lib/api-client"
+import { apiClient } from "@/lib/api-client"
 
 interface User {
   _id?: string
@@ -57,7 +57,8 @@ export function UsersList() {
 
     try {
       setIsLoading(true)
-      const response = await userApi.getUsers(user.token)
+      const response = await apiClient.getUsers()
+
       console.log("[UsersList] Fetch response:", response)
 
       if (response.success && response.data) {
@@ -117,7 +118,7 @@ export function UsersList() {
       }
 
       console.log("[UsersList] Creating user:", createData)
-      const response = await userApi.createUser(createData, user.token)
+      const response = await apiClient.createUser(createData)
 
       if (response.success && response.data) {
         const newUser: User = {
@@ -159,8 +160,8 @@ export function UsersList() {
       // Optimistic update - remove immediately from UI
       setUsers(prevUsers => prevUsers.filter(u => u._id !== userId))
       
-      const response = await userApi.deleteUser(userId, user.token)
-      console.log("Delete response:", response)
+      const response = await apiClient.deleteUser(userId)
+
 
       if (!response.success) {
         // If delete failed, refetch users to restore state
@@ -195,7 +196,8 @@ export function UsersList() {
       }
       
       console.log("Sending update:", updateData)
-      const response = await userApi.updateUser(userId, updateData, user.token)
+      const response = await apiClient.updateUser(userId, updateData)
+
       console.log("Update response:", response)
 
       if (response.success && response.data) {
