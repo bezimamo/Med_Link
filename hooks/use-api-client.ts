@@ -1,7 +1,7 @@
 // hooks/use-api-client.ts
 "use client"
 
-import { apiClient } from "@/lib/api-client"
+import { apiClient } from "@/lib/api-client1"
 import { useAuth } from "@/lib/auth-context"
 import { useEffect } from "react"
 

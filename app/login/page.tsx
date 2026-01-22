@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { apiClient } from "@/lib/api-client"
+import { apiClient } from "@/lib/api-client1"
 import { useAuth } from "@/lib/auth-context"
 
 type UserRole = "system-admin" | "hospital-admin" | "liaison" | "doctor"
@@ -57,7 +57,7 @@ export default function LoginPage() {
 
     try {
       console.log("🔄 Sending login request...")
-      const response = await fetch("http://localhost:3001/auth/login", {
+      const response = await fetch("http://localhost:3000/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

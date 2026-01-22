@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { apiClient } from "@/lib/api-client"
+import { apiClient } from "@/lib/api-client1"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Hospital, Users, Activity } from "lucide-react"
 

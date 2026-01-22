@@ -2,7 +2,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { apiClient } from "@/lib/api-client"
+import { apiClient } from "@/lib/api-client1"
 import { useAuth } from "@/lib/auth-context" // Import useAuth to get token
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
